@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block bodyclass %}auth{% endblock %}
+{% block shell %}
+{% from "_icons.html" import icon %}
+<div class="auth-split">
+  <aside class="auth-side">
+    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">{{ icon('activity', 20) }}</span> MediTrack</a>
+    <div>
+      <h2>Votre Santé est notre periorité!</h2>
+      <p>une plateforme pour simplifier la gestion quotidienne de votre cabinet mécicale et améliorer le suivi des patients.</p>
+      <ul class="points">
+        <li><span class="chip-icon">{{ icon('shield', 18) }}</span><span><b>Sécurité des données</b><br>Vos informations sont protégées </span></li>
+        <li><span class="chip-icon">{{ icon('user', 18) }}</span><span><b>Gestion des utilisateurs</b><br>Acceés adapté à chaque role.</span></li>
+        <li><span class="chip-icon">{{ icon('file', 18) }}</span><span><b>Suivi médicale</b><br>Rendez vous et dossier en meme endroit.</span></li>
+      </ul>
+    </div>
+    
+  </aside>
+  <section class="auth-main">
+    <div class="auth-box">
+      {% include "_flash.html" %}
+      {% block auth_content %}{% endblock %}
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block content %}
+{% from "_icons.html" import icon %}
+
+{# ===================================================== PATIENT ===================================================== #}
+{% if session.role == 'patient' %}
+<div class="page-head">
+  <div><h1>Bonjour, {{ session.fullname.split(' ')[0] }}</h1><p>Votre espace santé : rendez-vous, notes de votre médecin et documents.</p></div>
+</div>
+<div class="grid stats">
+  <div class="card stat"><span class="chip-icon">{{ icon('calendar', 22) }}</span><div><b>{{ appointments|length }}</b><span>Rendez-vous</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('file', 22) }}</span><div><b>{{ notes|length }}</b><span>Notes médicales</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('upload', 22) }}</span><div><b>{{ documents|length }}</b><span>Documents</span></div></div>
+</div>
+<div class="grid cols-2">
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('calendar') }}</span><h2>Mes rendez-vous</h2></div>
+    {% if appointments %}
+    <div class="table-wrap"><table>
+      <tr><th>Date</th><th>Médecin</th><th>Motif</th></tr>
+      {% for a in appointments %}<tr><td>{{ a.when }}</td><td>{{ names[a.doctor_id] }}</td><td>{{ a.reason }}</td></tr>{% endfor %}
+    </table></div>
+    {% else %}<div class="empty">Aucun rendez-vous.</div>{% endif %}
+  </section>
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('file') }}</span><h2>Notes de mon médecin</h2><span class="badge warn push">Confidentiel</span></div>
+    {% for n in notes %}
+    <div class="note"><div class="meta"><span>{{ names[n.doctor_id] }}</span><span>{{ n.created.strftime('%d/%m/%Y') if n.created else '' }}</span></div><p>{{ n.content }}</p></div>
+    {% else %}<div class="empty">Aucune note.</div>{% endfor %}
+  </section>
+  <section class="card full">
+    <div class="card-head"><span class="chip-icon">{{ icon('upload') }}</span><h2>Mes documents</h2></div>
+    <ul class="list">
+      {% for d in documents %}
+      <li><span class="chip-icon">{{ icon('file', 16) }}</span><span class="grow">{{ d.filename }}<br><small>{{ d.created.strftime('%d/%m/%Y') if d.created else '' }}</small></span>
+        <a class="btn ghost small" href="{{ url_for('download_document', doc_id=d.id) }}">{{ icon('download', 15) }} Télécharger</a></li>
+      {% else %}<li class="empty">Aucun document.</li>{% endfor %}
+    </ul>
+    <form method="post" action="{{ url_for('upload_document') }}" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <div class="row"><label>Ajouter un document (pdf, png, jpg, txt – 5 Mo max)<input type="file" name="file" required></label></div>
+      <div class="form-actions"><button class="btn" type="submit">{{ icon('upload', 16) }} Envoyer</button></div>
+    </form>
+  </section>
+</div>
+
+{# ===================================================== SECRETAIRE ===================================================== #}
+{% elif session.role == 'secretaire' %}
+<div class="page-head">
+  <div><h1>Agenda du cabinet</h1><p>Gestion des rendez-vous. Les notes et documents médicaux ne sont pas accessibles à ce rôle.</p></div>
+</div>
+<div class="grid stats">
+  <div class="card stat"><span class="chip-icon">{{ icon('calendar', 22) }}</span><div><b>{{ appointments|length }}</b><span>Rendez-vous</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('users', 22) }}</span><div><b>{{ patients|length }}</b><span>Patients</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('user', 22) }}</span><div><b>{{ doctors|length }}</b><span>Médecins</span></div></div>
+</div>
+<div class="grid cols-2">
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('calendar') }}</span><h2>Tous les rendez-vous</h2></div>
+    <div class="table-wrap"><table>
+      <tr><th>Date</th><th>Patient</th><th>Médecin</th><th>Motif</th></tr>
+      {% for a in appointments %}<tr><td>{{ a.when }}</td><td>{{ names[a.patient_id] }}</td><td>{{ names[a.doctor_id] }}</td><td>{{ a.reason }}</td></tr>
+      {% else %}<tr><td colspan="4" class="empty">Aucun rendez-vous.</td></tr>{% endfor %}
+    </table></div>
+  </section>
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('plus') }}</span><h2>Nouveau rendez-vous</h2></div>
+    <form method="post" action="{{ url_for('add_appointment') }}" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <div class="row">
+        <label>Patient<select name="patient_id">{% for p in patients %}<option value="{{ p.id }}">{{ p.fullname }}</option>{% endfor %}</select></label>
+        <label>Médecin<select name="doctor_id">{% for d in doctors %}<option value="{{ d.id }}">{{ d.fullname }}</option>{% endfor %}</select></label>
+      </div>
+      <div class="row">
+        <label>Date et heure<input type="datetime-local" name="when" required></label>
+        <label>Motif<input name="reason" maxlength="200" required></label>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">{{ icon('plus', 16) }} Ajouter</button></div>
+    </form>
+  </section>
+</div>
+
+{# ===================================================== MEDECIN ===================================================== #}
+{% elif session.role == 'medecin' %}
+<div class="page-head">
+  <div><h1>{{ session.fullname }}</h1><p>Vous n'avez accès qu'aux patients qui vous sont rattachés.</p></div>
+</div>
+<div class="grid stats">
+  <div class="card stat"><span class="chip-icon">{{ icon('users', 22) }}</span><div><b>{{ patients|length }}</b><span>Mes patients</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('calendar', 22) }}</span><div><b>{{ appointments|length }}</b><span>Rendez-vous</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('file', 22) }}</span><div><b>{{ notes|length }}</b><span>Notes</span></div></div>
+</div>
+<div class="grid cols-2">
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('calendar') }}</span><h2>Mes rendez-vous</h2></div>
+    <div class="table-wrap"><table>
+      <tr><th>Date</th><th>Patient</th><th>Motif</th></tr>
+      {% for a in appointments %}<tr><td>{{ a.when }}</td><td>{{ names[a.patient_id] }}</td><td>{{ a.reason }}</td></tr>
+      {% else %}<tr><td colspan="3" class="empty">Aucun rendez-vous.</td></tr>{% endfor %}
+    </table></div>
+  </section>
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('users') }}</span><h2>Mes patients</h2></div>
+    <ul class="list">
+      {% for p in patients %}<li><span class="avatar">{{ p.fullname[:1] }}</span><span class="grow">{{ p.fullname }}</span><span class="badge">Rattaché</span></li>
+      {% else %}<li class="empty">Aucun patient rattaché. Demandez à l'administrateur de créer un rattachement.</li>{% endfor %}
+    </ul>
+  </section>
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('file') }}</span><h2>Notes médicales</h2><span class="badge warn push">Confidentiel</span></div>
+    {% for n in notes %}
+    <div class="note"><div class="meta"><span>{{ names[n.patient_id] }}</span><span>{{ names[n.doctor_id] }} · {{ n.created.strftime('%d/%m/%Y') if n.created else '' }}</span></div><p>{{ n.content }}</p></div>
+    {% else %}<div class="empty">Aucune note.</div>{% endfor %}
+    {% if patients %}
+    <form method="post" action="{{ url_for('add_note') }}" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <label>Patient<select name="patient_id">{% for p in patients %}<option value="{{ p.id }}">{{ p.fullname }}</option>{% endfor %}</select></label>
+      <label>Nouvelle note<textarea name="content" maxlength="5000" required></textarea></label>
+      <div class="form-actions"><button class="btn" type="submit">{{ icon('plus', 16) }} Enregistrer la note</button></div>
+    </form>
+    {% endif %}
+  </section>
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('upload') }}</span><h2>Documents des patients</h2></div>
+    <ul class="list">
+      {% for d in documents %}
+      <li><span class="chip-icon">{{ icon('file', 16) }}</span><span class="grow">{{ d.filename }}<br><small>{{ names[d.patient_id] }}</small></span>
+        <a class="btn ghost small" href="{{ url_for('download_document', doc_id=d.id) }}">{{ icon('download', 15) }} Télécharger</a></li>
+      {% else %}<li class="empty">Aucun document.</li>{% endfor %}
+    </ul>
+    {% if patients %}
+    <form method="post" action="{{ url_for('upload_document') }}" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <div class="row">
+        <label>Patient<select name="patient_id">{% for p in patients %}<option value="{{ p.id }}">{{ p.fullname }}</option>{% endfor %}</select></label>
+        <label>Fichier<input type="file" name="file" required></label>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">{{ icon('upload', 16) }} Envoyer</button></div>
+    </form>
+    {% endif %}
+  </section>
+</div>
+
+{# ===================================================== ADMIN ===================================================== #}
+{% elif session.role == 'admin' %}
+<div class="page-head">
+  <div><h1>Administration</h1><p>Gestion des comptes et des rattachements. Aucune donnée médicale n'est accessible à ce rôle.</p></div>
+</div>
+<div class="grid stats">
+  <div class="card stat"><span class="chip-icon">{{ icon('users', 22) }}</span><div><b>{{ users|length }}</b><span>Comptes</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('link', 22) }}</span><div><b>{{ links|length }}</b><span>Rattachements</span></div></div>
+  <div class="card stat"><span class="chip-icon">{{ icon('lock', 22) }}</span><div><b>{{ locked_ids|length }}</b><span>Comptes verrouillés</span></div></div>
+</div>
+<div class="grid cols-2">
+  <section class="card full">
+    <div class="card-head"><span class="chip-icon">{{ icon('users') }}</span><h2>Comptes utilisateurs</h2></div>
+    <div class="table-wrap"><table>
+      <tr><th>Identifiant</th><th>Nom</th><th>Rôle</th><th>E-mail</th><th>MFA</th><th>État</th><th></th></tr>
+      {% for u in users %}
+      <tr>
+        <td><b>{{ u.username }}</b></td><td>{{ u.fullname }}</td>
+        <td><span class="badge blue">{{ ROLE_LABELS[u.role] }}</span></td>
+        <td>{{ u.email }}</td>
+        <td>{% if u.role in ('medecin','secretaire','admin') %}<span class="badge ok">Obligatoire</span>{% elif u.mfa_enabled %}<span class="badge ok">Activé</span>{% else %}<span class="badge grey">Non</span>{% endif %}</td>
+        <td>{% if u.id in locked_ids %}<span class="badge danger">Verrouillé</span>{% else %}<span class="badge ok">Actif</span>{% endif %}</td>
+        <td>{% if u.id in locked_ids %}
+          <form method="post" action="{{ url_for('admin_unlock', user_id=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="btn ghost small" type="submit">Déverrouiller</button></form>
+        {% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table></div>
+  </section>
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('plus') }}</span><h2>Créer un compte</h2></div>
+    <form method="post" action="{{ url_for('admin_create_user') }}" class="stack" autocomplete="off">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <div class="row">
+        <label>Identifiant<input name="username" required></label>
+        <label>Nom complet<input name="fullname" required></label>
+      </div>
+      <div class="row">
+        <label>E-mail<input type="email" name="email" required></label>
+        <label>Rôle<select name="role">{% for r in ('patient','secretaire','medecin','admin') %}<option value="{{ r }}">{{ ROLE_LABELS[r] }}</option>{% endfor %}</select></label>
+      </div>
+      <label>Mot de passe initial<input type="password" name="password" autocomplete="new-password" required></label>
+      <label class="check"><input type="checkbox" name="mfa" value="1"> Activer le MFA (obligatoire d'office pour le personnel)</label>
+      <div class="form-actions"><button class="btn" type="submit">{{ icon('plus', 16) }} Créer le compte</button></div>
+    </form>
+  </section>
+  <section class="card">
+    <div class="card-head"><span class="chip-icon">{{ icon('link') }}</span><h2>Rattachements médecin ↔ patient</h2></div>
+    <p class="hint">Un médecin n'accède qu'aux patients rattachés (contrôle ABAC).</p>
+    <div class="table-wrap"><table>
+      <tr><th>Médecin</th><th>Patient</th><th></th></tr>
+      {% for l in links %}
+      <tr><td>{{ names[l.doctor_id] }}</td><td>{{ names[l.patient_id] }}</td>
+        <td><form method="post" action="{{ url_for('admin_delete_link', link_id=l.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="btn danger-outline small" type="submit">Retirer</button></form></td></tr>
+      {% else %}<tr><td colspan="3" class="empty">Aucun rattachement.</td></tr>{% endfor %}
+    </table></div>
+    <form method="post" action="{{ url_for('admin_add_link') }}" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <div class="row">
+        <label>Médecin<select name="doctor_id">{% for d in doctors %}<option value="{{ d.id }}">{{ d.fullname }}</option>{% endfor %}</select></label>
+        <label>Patient<select name="patient_id">{% for p in patients %}<option value="{{ p.id }}">{{ p.fullname }}</option>{% endfor %}</select></label>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">{{ icon('link', 16) }} Rattacher</button></div>
+    </form>
+  </section>
+</div>
+{% endif %}
+
+{% endblock %}

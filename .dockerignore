@@ -1,0 +1,14 @@
+# Fichiers exclus de l'image Docker.
+.env
+.env.example
+.git
+.gitignore
+.dockerignore
+docker-compose.yml
+*.md
+*.db
+uploads/
+__pycache__/
+*.pyc
+.DS_Store
+*.log

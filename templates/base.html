@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediTrack · Cabinet médical</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% block shell %}
+{% from "_icons.html" import icon %}
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="brand-mark">{{ icon('activity', 20) }}</span> MediTrack
+    </a>
+    {% if session.uid %}
+    <div class="userbox">
+      <span class="avatar">{{ session.fullname[:1] }}</span>
+      <span class="who"><strong>{{ session.fullname }}</strong><small>{{ ROLE_LABELS[session.role] }}</small></span>
+      <a class="btn ghost small" href="{{ url_for('change_password') }}">{{ icon('key', 15) }} Mot de passe</a>
+      <form method="post" action="{{ url_for('logout') }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn ghost small" type="submit">{{ icon('logout', 15) }} Déconnexion</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</header>
+<main class="container">
+  {% include "_flash.html" %}
+  {% block content %}{% endblock %}
+</main>
+<div class="footer">Votre Cabinet Meditrack. .</div>
+{% endblock %}
+</body>
+</html>

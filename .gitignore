@@ -1,0 +1,12 @@
+# Fichiers exclus de GitHub.
+.env
+*.db
+*.sqlite3
+uploads/
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+.DS_Store
+*.log
