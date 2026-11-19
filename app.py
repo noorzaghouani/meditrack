@@ -19,6 +19,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 # Configuration
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
+os.environ["AWS_DEFAULT_REGION"] = AWS_REGION
+os.environ["AWS_REGION"] = AWS_REGION
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///meditrack.db")
 S3_BUCKET    = os.environ.get("S3_BUCKET", "")
 KMS_KEY_ID   = os.environ.get("KMS_KEY_ID", "")
@@ -97,8 +100,11 @@ audit_logger.propagate = False
 # CloudWatch Logs
 if CLOUDWATCH_LOG_GROUP:
     try:
+        import boto3
         import watchtower
+        _cw_logs_client = boto3.client("logs", region_name=AWS_REGION)
         _cw_handler = watchtower.CloudWatchLogHandler(
+            boto3_client=_cw_logs_client,
             log_group_name=CLOUDWATCH_LOG_GROUP,
             log_stream_name="audit",
         )
@@ -248,7 +254,7 @@ def store_file(key, fileobj):
         import boto3
         extra = {"ServerSideEncryption": "aws:kms", "SSEKMSKeyId": KMS_KEY_ID} if KMS_KEY_ID \
             else {"ServerSideEncryption": "AES256"}
-        boto3.client("s3").upload_fileobj(fileobj, S3_BUCKET, key, ExtraArgs=extra)
+        boto3.client("s3", region_name=AWS_REGION).upload_fileobj(fileobj, S3_BUCKET, key, ExtraArgs=extra)
     else:
         path = os.path.join(UPLOAD_DIR, key)
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -261,7 +267,7 @@ def fetch_file(key, filename):
 
         import boto3
         buf = io.BytesIO()
-        boto3.client("s3").download_fileobj(S3_BUCKET, key, buf)
+        boto3.client("s3", region_name=AWS_REGION).download_fileobj(S3_BUCKET, key, buf)
         buf.seek(0)
         return send_file(buf, download_name=filename, as_attachment=True)
     return send_file(os.path.join(UPLOAD_DIR, key), download_name=filename, as_attachment=True)
@@ -371,7 +377,7 @@ def deliver_mfa_code(user, code):
     if SNS_TOPIC_ARN:
         try:
             import boto3
-            boto3.client("sns").publish(
+            boto3.client("sns", region_name=AWS_REGION).publish(
                 TopicArn=SNS_TOPIC_ARN,
                 Subject="MediTrack - code de verification",
                 Message=f"Code de connexion pour {user.username} : {code}\n"
