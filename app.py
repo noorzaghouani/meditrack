@@ -26,7 +26,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///meditrack.db")
 S3_BUCKET    = os.environ.get("S3_BUCKET", "")
 KMS_KEY_ID   = os.environ.get("KMS_KEY_ID", "")
 UPLOAD_DIR   = os.environ.get("UPLOAD_DIR", "uploads")
-SNS_TOPIC_ARN= os.environ.get("SNS_TOPIC_ARN", "")
+SES_SENDER_EMAIL = os.environ.get("SES_SENDER_EMAIL", "")
 MFA_DEMO     = os.environ.get("MFA_DEMO", "0") == "1"
 SEED_PASSWORD= os.environ.get("SEED_PASSWORD")
 if not SEED_PASSWORD:
@@ -373,15 +373,29 @@ def can_access_patient(db, patient_id):
 
 
 def deliver_mfa_code(user, code):
-    """Envoi du code MFA."""
-    if SNS_TOPIC_ARN:
+    """Envoi du code MFA uniquement à l'adresse e-mail de l'utilisateur via Amazon SES."""
+    if SES_SENDER_EMAIL:
+        if not user.email or "@" not in user.email:
+            audit("mfa_send_failed", "failure", actor=user.username, error="invalid_email")
+            return False
         try:
             import boto3
-            boto3.client("sns", region_name=AWS_REGION).publish(
-                TopicArn=SNS_TOPIC_ARN,
-                Subject="MediTrack - code de verification",
-                Message=f"Code de connexion pour {user.username} : {code}\n"
-                        f"Valable {MFA_TTL_MIN} minutes. Ne le communiquez à personne.")
+            boto3.client("ses", region_name=AWS_REGION).send_email(
+                Source=SES_SENDER_EMAIL,
+                Destination={"ToAddresses": [user.email]},
+                Message={
+                    "Subject": {"Data": "MediTrack - code de verification", "Charset": "UTF-8"},
+                    "Body": {
+                        "Text": {
+                            "Data": (
+                                f"Code de connexion pour {user.username} : {code}\n"
+                                f"Valable {MFA_TTL_MIN} minutes. Ne le communiquez à personne."
+                            ),
+                            "Charset": "UTF-8",
+                        }
+                    },
+                },
+            )
             return True
         except Exception as exc:  # noqa: BLE001
             audit("mfa_send_failed", "failure", actor=user.username, error=type(exc).__name__)
