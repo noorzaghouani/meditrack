@@ -62,7 +62,8 @@ sudo docker run -d --name meditrack --restart unless-stopped -p 80:8080 \
 | `SECRET_KEY` | **mandatory** (app refuses to start without it); must be identical across all workers |
 | `DATABASE_URL` | RDS PostgreSQL (if omitted: ephemeral SQLite for initial testing) |
 | `S3_BUCKET` / `KMS_KEY_ID` | documents in S3 (SSE-S3 encryption, or SSE-KMS if `KMS_KEY_ID` is set) |
-| `SES_SENDER_EMAIL` | verified Amazon SES sender address for delivering MFA codes to the user's email |
+| `SES_SENDER_EMAIL` | verified Amazon SES sender address for delivering MFA codes directly to the user's email |
+| `SNS_TOPIC_ARN` | fallback SNS topic (uses `email` `MessageAttributes` so SNS Subscription Filter Policies deliver only to the target user) |
 | `MFA_DEMO` | `1` = code written to logs (local testing only) |
 | `COOKIE_SECURE` | `1` behind HTTPS (CloudFront / ALB) |
 | `LOGIN_MAX_FAILED`, `LOCK_MINUTES`, `MFA_TTL_MIN`, `MFA_MAX_TRIES` | security tuning parameters |

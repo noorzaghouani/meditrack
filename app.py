@@ -27,6 +27,7 @@ S3_BUCKET    = os.environ.get("S3_BUCKET", "")
 KMS_KEY_ID   = os.environ.get("KMS_KEY_ID", "")
 UPLOAD_DIR   = os.environ.get("UPLOAD_DIR", "uploads")
 SES_SENDER_EMAIL = os.environ.get("SES_SENDER_EMAIL", "")
+SNS_TOPIC_ARN    = os.environ.get("SNS_TOPIC_ARN", "")
 MFA_DEMO     = os.environ.get("MFA_DEMO", "0") == "1"
 SEED_PASSWORD= os.environ.get("SEED_PASSWORD")
 if not SEED_PASSWORD:
@@ -373,11 +374,12 @@ def can_access_patient(db, patient_id):
 
 
 def deliver_mfa_code(user, code):
-    """Envoi du code MFA uniquement à l'adresse e-mail de l'utilisateur via Amazon SES."""
-    if SES_SENDER_EMAIL:
+    """Envoi du code MFA uniquement à l'adresse e-mail de l'utilisateur (SES ou SNS filtré)."""
+    if SES_SENDER_EMAIL or SNS_TOPIC_ARN:
         if not user.email or "@" not in user.email:
             audit("mfa_send_failed", "failure", actor=user.username, error="invalid_email")
             return False
+    if SES_SENDER_EMAIL:
         try:
             import boto3
             boto3.client("ses", region_name=AWS_REGION).send_email(
@@ -394,6 +396,27 @@ def deliver_mfa_code(user, code):
                             "Charset": "UTF-8",
                         }
                     },
+                },
+            )
+            return True
+        except Exception as exc:  # noqa: BLE001
+            audit("mfa_send_failed", "failure", actor=user.username, error=type(exc).__name__)
+            return False
+    if SNS_TOPIC_ARN:
+        try:
+            import boto3
+            boto3.client("sns", region_name=AWS_REGION).publish(
+                TopicArn=SNS_TOPIC_ARN,
+                Subject="MediTrack - code de verification",
+                Message=(
+                    f"Code de connexion pour {user.username} : {code}\n"
+                    f"Valable {MFA_TTL_MIN} minutes. Ne le communiquez à personne."
+                ),
+                MessageAttributes={
+                    "email": {
+                        "DataType": "String",
+                        "StringValue": user.email,
+                    }
                 },
             )
             return True
